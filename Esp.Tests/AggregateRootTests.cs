@@ -3,34 +3,58 @@ namespace Esp.Tests;
 public class AggregateRootTests
 {
     [Test]
-    public void ApplyEventShouldStoreEventInStream()
+    public void InitializeShouldStoreEventInStream()
     {
         var order = new Order();
         var @event = new Event(1, "Order", 1, 1, "OrderCreated", "{}", DateTime.Now);
 
-        order.ApplyEvent(@event);
+        order.Initilize(1, new[] { @event });
 
-        Assert.That(order.EventStream, Is.Not.Null);
-        Assert.That(order.EventStream, Has.Count.EqualTo(1));
-        Assert.That(order.EventStream[0], Is.EqualTo(@event));
+        Assert.That(order.GetEventStream(), Is.Not.Null);
+        Assert.That(order.GetEventStream(), Has.Count.EqualTo(1));
+        Assert.That(order.GetEventStream()[0], Is.EqualTo(@event));
     }
 }
 
 public class Order : IAggregateRoot
 {
-    public int Id { get; set; }
-    public List<Event> EventStream { get; set; }
+    private readonly List<Event> eventStream = new();
+
+    public int Id { get; private set; }
+
+    public IReadOnlyList<Event> GetEventStream() => eventStream;
+
+    public void Initilize(int id, IEnumerable<Event> events)
+    {
+        Id = id;
+        eventStream.AddRange(events);
+        eventStream.ForEach(ApplyEvent);
+    }
 
     public void ApplyEvent(Event @event)
     {
-        throw new NotImplementedException();
+        switch (@event.EventType)
+        {
+            case "OrderCreated":
+                break;
+        }
+    }
+
+    public void PlaceOrder()
+    {
+        var @event = new Event(1, "Order", 1, 1, "OrderCreated", "{}", DateTime.Now);
+        eventStream.Add(@event);
+        ApplyEvent(@event);
     }
 }
 
 public interface IAggregateRoot
 {
     int Id { get; }
-    List<Event> EventStream { get; }
+
+    IReadOnlyList<Event> GetEventStream();
+
+    void Initilize(int id, IEnumerable<Event> events);
 
     void ApplyEvent(Event @event);
 }
