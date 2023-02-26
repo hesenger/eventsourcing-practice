@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Esp.Tests;
 
 public class AggregateRootTests
@@ -6,7 +8,7 @@ public class AggregateRootTests
     public void InitializeShouldStoreEventInStream()
     {
         var order = new Order();
-        var @event = new Event(1, "Order", 1, 1, "OrderCreated", "{}", DateTime.Now);
+        var @event = new Event(1, "Order", 1, 1, "Esp.Tests.OrderCreated", "{\"CreateAt\": \"2021-01-01 08:00\"}", DateTime.Now);
 
         order.Initilize(1, new[] { @event });
 
@@ -21,32 +23,34 @@ public class Order : IAggregateRoot
     private readonly List<Event> eventStream = new();
 
     public int Id { get; private set; }
+    public DateTime CreatedAt { get; private set; }
 
     public IReadOnlyList<Event> GetEventStream() => eventStream;
 
     public void Initilize(int id, IEnumerable<Event> events)
     {
         Id = id;
-        eventStream.AddRange(events);
-        eventStream.ForEach(ApplyEvent);
-    }
-
-    public void ApplyEvent(Event @event)
-    {
-        switch (@event.EventType)
+        foreach (var @event in events)
         {
-            case "OrderCreated":
-                break;
+            ApplyEvent((dynamic)@event.ToDomainEvent());
+            eventStream.Add(@event);
         }
     }
 
-    public void PlaceOrder()
+    public void PlaceOrder(DateTime createdAt)
     {
-        var @event = new Event(1, "Order", 1, 1, "OrderCreated", "{}", DateTime.Now);
-        eventStream.Add(@event);
+        OrderCreated @event = new(createdAt);
         ApplyEvent(@event);
+        eventStream.Add(Event.FromDomainEvent(this, @event));
+    }
+
+    private void ApplyEvent(OrderCreated @event)
+    {
+        CreatedAt = @event.CreatedAt;
     }
 }
+
+public record OrderCreated(DateTime CreatedAt) : IDomainEvent;
 
 public interface IAggregateRoot
 {
@@ -55,8 +59,10 @@ public interface IAggregateRoot
     IReadOnlyList<Event> GetEventStream();
 
     void Initilize(int id, IEnumerable<Event> events);
+}
 
-    void ApplyEvent(Event @event);
+public interface IDomainEvent
+{
 }
 
 public record Event(
@@ -67,4 +73,25 @@ public record Event(
     string EventType,
     string EventData,
     DateTime EventDate
-);
+)
+{
+    public IDomainEvent ToDomainEvent()
+    {
+        var type = Type.GetType(EventType)!;
+        return (IDomainEvent)JsonSerializer.Deserialize(EventData, type)!;
+    }
+
+    public static Event FromDomainEvent(IAggregateRoot root, IDomainEvent domainEvent)
+    {
+        var type = domainEvent.GetType();
+        var data = JsonSerializer.Serialize(domainEvent);
+        return new Event(
+            0,
+            root.GetType().Name,
+            root.Id,
+            root.GetEventStream().Count + 1,
+            type.FullName!,
+            data,
+            DateTime.Now);
+    }
+};
