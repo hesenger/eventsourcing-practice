@@ -2,11 +2,13 @@ namespace Esp.Tests;
 
 public class AggregateRootTests
 {
+    private const string ValidOrderCreatedEventData = "{\"CreatedAt\": \"2023-02-26T11:29:35.917815-03:00\"}";
+
     [Test]
     public void InitializeShouldRehydrateEventStream()
     {
         var order = new Order();
-        var @event = new Event(1, "Order", 1, 1, "Esp.Tests.OrderCreated", "{\"CreatedAt\": \"2021-01-01 08:00\"}", DateTime.Now);
+        var @event = new Event(1, "Order", 1, 1, "Esp.Tests.OrderCreated", ValidOrderCreatedEventData, DateTime.Now);
 
         order.Initilize(1, new[] { @event });
 
@@ -17,7 +19,7 @@ public class AggregateRootTests
     public void InitializeShouldApplyEventToState()
     {
         var order = new Order();
-        var @event = new Event(1, "Order", 1, 1, "Esp.Tests.OrderCreated", "{\"CreatedAt\": \"2023-02-26T11:29:35.917815-03:00\"}", DateTime.Now);
+        var @event = new Event(1, "Order", 1, 1, "Esp.Tests.OrderCreated", ValidOrderCreatedEventData, DateTime.Now);
 
         order.Initilize(42, new[] { @event });
 
